@@ -21,6 +21,28 @@ def home():
 def webhook():
     data = request.get_json()
 
+    if not data or "message" not in data:
+        return "ok"
+
+    chat_id = data["message"]["chat"]["id"]
+    text = data["message"].get("text", "")
+
+    text_lower = text.lower()
+
+    if "galatasaray" in text_lower or "fenerbahçe" in text_lower:
+        api_data = get_matches()
+
+        if api_data:
+            reply = "📊 Maç verisi çekildi. Basit analiz aktif."
+        else:
+            reply = "❌ Veri alınamadı (API kontrol et)"
+
+    else:
+        reply = "Takım adı yaz (örn: galatasaray / fenerbahçe)"
+
+    send_message(chat_id, reply)
+
+    return "ok"
     if data and "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
