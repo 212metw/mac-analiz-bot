@@ -23,28 +23,28 @@ def send_message(chat_id, text):
         pass
 
 
-# ---------------- FIXTURE SEARCH ----------------
-def search_matches(text):
-    url = f"{API_HOST}/fixtures"
-    headers = {"x-apisports-key": API_KEY}
-
-    params = {
-        "next": 10
-    }
-
+# ---------------- 1. FIXTURE SEARCH ----------------
+def search_by_text(text):
     try:
-        r = requests.get(url, headers=headers, timeout=10)
-        data = r.json()
+        url = f"{API_HOST}/fixtures"
+        headers = {"x-apisports-key": API_KEY}
+        params = {"search": text, "next": 10}
 
-        for match in data.get("response", []):
-            home = match["teams"]["home"]["name"].lower()
-            away = match["teams"]["away"]["name"].lower()
+        r = requests.get(url, headers=headers, params=params, timeout=10)
+        return r.json()
+    except:
+        return None
 
-            if text.lower() in home or text.lower() in away:
-                return {"response": [match]}
 
-        return data
+# ---------------- 2. NEXT MATCHES ----------------
+def get_next_matches():
+    try:
+        url = f"{API_HOST}/fixtures"
+        headers = {"x-apisports-key": API_KEY}
+        params = {"next": 10}
 
+        r = requests.get(url, headers=headers, params=params, timeout=10)
+        return r.json()
     except:
         return None
 
@@ -52,40 +52,48 @@ def search_matches(text):
 # ---------------- WEBHOOK ----------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    try:
-        data = request.get_json(silent=True)
+    data = request.get_json(silent=True)
 
-        if not data or "message" not in data:
-            return "ok"
-
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "")
-
-        result = search_matches(text)
-
-        if result and result.get("response"):
-            match = result["response"][0]
-
-            home = match["teams"]["home"]["name"]
-            away = match["teams"]["away"]["name"]
-            league = match["league"]["name"]
-            date = match["fixture"]["date"]
-
-            reply = (
-                "📊 MAÇ BULUNDU\n\n"
-                f"🏟️ {home} vs {away}\n"
-                f"🏆 {league}\n"
-                f"📅 {date}"
-            )
-        else:
-            reply = "Maç bulunamadı. Lütfen takım adını doğru yaz."
-
-        send_message(chat_id, reply)
+    if not data or "message" not in data:
         return "ok"
 
-    except Exception as e:
-        print("WEBHOOK ERROR:", e)
-        return "ok"
+    chat_id = data["message"]["chat"]["id"]
+    text = data["message"].get("text", "").lower()
+
+    result = search_by_text(text)
+
+    match = None
+
+    # 1. TEXT SEARCH DENEME
+    if result and result.get("response"):
+        match = result["response"][0]
+
+    # 2. YOKSA NEXT MATCHES DENEME
+    if not match:
+        result2 = get_next_matches()
+
+        if result2 and result2.get("response"):
+            for m in result2["response"]:
+                home = m["teams"]["home"]["name"].lower()
+                away = m["teams"]["away"]["name"].lower()
+
+                if text in home or text in away:
+                    match = m
+                    break
+
+    # ---------------- RESPONSE ----------------
+    if match:
+        reply = (
+            "📊 MAÇ BULUNDU\n\n"
+            f"🏟️ {match['teams']['home']['name']} vs {match['teams']['away']['name']}\n"
+            f"🏆 {match['league']['name']}\n"
+            f"📅 {match['fixture']['date']}"
+        )
+    else:
+        reply = "Maç bulunamadı (API eşleşmedi)"
+
+    send_message(chat_id, reply)
+    return "ok"
 
 
 @app.route("/")
