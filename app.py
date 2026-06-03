@@ -13,7 +13,7 @@ def send_message(chat_id, text):
         "text": text
     })
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return "Bot çalışıyor"
 
@@ -25,12 +25,14 @@ def webhook():
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
 
-        if "galatasaray" in text.lower() and "fener" in text.lower():
-    reply = "Derbi: dengeli maç, gol var ihtimali yüksek"
-else:
-    reply = "Takım isimlerini yaz (örnek: galatasaray fenerbahçe)"
+        text_lower = text.lower()
 
-send_message(chat_id, reply)
+        if "galatasaray" in text_lower and "fener" in text_lower:
+            reply = "Derbi: dengeli maç, gol var ihtimali yüksek"
+        else:
+            reply = "Takım isimlerini yaz (örnek: galatasaray fenerbahçe)"
+
+        send_message(chat_id, reply)
 
     return "ok"
 
