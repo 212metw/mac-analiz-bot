@@ -25,7 +25,12 @@ def webhook():
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
 
-        send_message(chat_id, "Alındı: " + text)
+        if "galatasaray" in text.lower() and "fener" in text.lower():
+    reply = "Derbi: dengeli maç, gol var ihtimali yüksek"
+else:
+    reply = "Takım isimlerini yaz (örnek: galatasaray fenerbahçe)"
+
+send_message(chat_id, reply)
 
     return "ok"
 
