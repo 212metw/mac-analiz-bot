@@ -16,33 +16,38 @@ def send_message(chat_id, text):
 @app.route("/")
 def home():
     return "Bot çalışıyor"
-
-@app.route(f"/webhook", methods=["POST"])
+@@app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    if not data or "message" not in data:
+        if not data or "message" not in data:
+            return "ok"
+
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
+
+        text_lower = text.lower()
+
+        if "galatasaray" in text_lower or "fenerbahçe" in text_lower:
+            try:
+                api_data = get_matches()
+                if api_data:
+                    reply = "📊 Maç verisi çekildi (API çalışıyor)"
+                else:
+                    reply = "❌ API veri dönmedi"
+            except:
+                reply = "❌ API hatası oluştu"
+        else:
+            reply = "Takım adı yaz (galatasaray / fenerbahçe)"
+
+        send_message(chat_id, reply)
+
         return "ok"
 
-    chat_id = data["message"]["chat"]["id"]
-    text = data["message"].get("text", "")
-
-    text_lower = text.lower()
-
-    if "galatasaray" in text_lower or "fenerbahçe" in text_lower:
-        api_data = get_matches()
-
-        if api_data:
-            reply = "📊 Maç verisi çekildi. Basit analiz aktif."
-        else:
-            reply = "❌ Veri alınamadı (API kontrol et)"
-
-    else:
-        reply = "Takım adı yaz (örn: galatasaray / fenerbahçe)"
-
-    send_message(chat_id, reply)
-
-    return "ok"
+    except Exception as e:
+        print("ERROR:", e)
+        return "ok"
     if data and "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
