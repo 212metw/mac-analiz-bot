@@ -20,63 +20,67 @@ def send_message(chat_id, text):
     )
 
 
-# ---------------- MATCH SEARCH ----------------
-def search_fixture(query):
-    url = f"{API_HOST}/fixtures"
+# ---------------- TEAM ID BUL ----------------
+def get_team_id(name):
+    url = f"{API_HOST}/teams"
     headers = {"x-apisports-key": API_KEY}
-    params = {"search": query}
+    params = {"search": name}
+
+    r = requests.get(url, headers=headers, params=params)
+    data = r.json()
 
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        return r.json()
-    except Exception as e:
-        print("API ERROR:", e)
+        return data["response"][0]["team"]["id"]
+    except:
         return None
+
+
+# ---------------- FIXTURE BUL ----------------
+def get_fixture(team1_id, team2_id):
+    url = f"{API_HOST}/fixtures"
+    headers = {"x-apisports-key": API_KEY}
+
+    params = {
+        "h2h": f"{team1_id}-{team2_id}",
+        "next": 10
+    }
+
+    r = requests.get(url, headers=headers, params=params)
+    return r.json()
 
 
 # ---------------- WEBHOOK ----------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.get_json(silent=True)
+        data = request.get_json()
 
         if not data or "message" not in data:
             return "ok"
 
-        message = data["message"]
-        chat_id = message.get("chat", {}).get("id")
-        text = message.get("text", "")
-
-        if not chat_id:
-            return "ok"
-
-        result = search_fixture(text)
-
-        if result and result.get("response"):
-            match = result["response"][0]
-
-            home = match["teams"]["home"]["name"]
-            away = match["teams"]["away"]["name"]
-            league = match["league"]["name"]
-
-            reply = f"🏟️ {home} vs {away}\n🏆 {league}"
-        else:
-            reply = "Maç bulunamadı"
-
-        send_message(chat_id, reply)
-        return "ok"
-
-    except Exception as e:
-        print("WEBHOOK ERROR:", e)
-        return "ok"
-
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
 
-        result = search_fixture(text)
+        parts = text.split()
+        if len(parts) < 2:
+            send_message(chat_id, "İki takım yaz: Galatasaray Fenerbahçe")
+            return "ok"
 
-        if result and result.get("response"):
-            match = result["response"][0]
+        team1_name = parts[0]
+        team2_name = parts[1]
+
+        team1_id = get_team_id(team1_name)
+        team2_id = get_team_id(team2_name)
+
+        if not team1_id or not team2_id:
+            send_message(chat_id, "Takımlar bulunamadı")
+            return "ok"
+
+        fixture = get_fixture(team1_id, team2_id)
+
+        if fixture and fixture.get("response"):
+            match = fixture["response"][0]
+
             home = match["teams"]["home"]["name"]
             away = match["teams"]["away"]["name"]
             league = match["league"]["name"]
@@ -86,13 +90,11 @@ def webhook():
 📊 MAÇ BULUNDU
 
 🏟️ {home} vs {away}
-🏆 Lig: {league}
-📅 Tarih: {date}
-
-🔎 Veri başarıyla çekildi
+🏆 {league}
+📅 {date}
 """
         else:
-            reply = "Maç bulunamadı (API sonucu boş döndü)"
+            reply = "Maç bulunamadı (H2H yok)"
 
         send_message(chat_id, reply)
         return "ok"
@@ -104,7 +106,7 @@ def webhook():
 
 @app.route("/")
 def home():
-    return "Bot çalışıyor"
+    return "Bot aktif"
 
 
 if __name__ == "__main__":
