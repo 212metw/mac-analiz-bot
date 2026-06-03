@@ -7,16 +7,24 @@ app = Flask(__name__)
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
+
 def send_message(chat_id, text):
-    requests.post(BASE_URL + "/sendMessage", json={
-        "chat_id": chat_id,
-        "text": text
-    })
+    try:
+        requests.post(
+            BASE_URL + "/sendMessage",
+            json={"chat_id": chat_id, "text": text},
+            timeout=5
+        )
+    except Exception as e:
+        print("SEND ERROR:", e)
+
 
 @app.route("/")
 def home():
     return "Bot çalışıyor"
-@@app.route("/webhook", methods=["POST"])
+
+
+@app.route("/webhook", methods=["POST"])
 def webhook():
     try:
         data = request.get_json()
@@ -26,42 +34,27 @@ def webhook():
 
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
-
         text_lower = text.lower()
 
-        if "galatasaray" in text_lower or "fenerbahçe" in text_lower:
-            try:
-                api_data = get_matches()
-                if api_data:
-                    reply = "📊 Maç verisi çekildi (API çalışıyor)"
-                else:
-                    reply = "❌ API veri dönmedi"
-            except:
-                reply = "❌ API hatası oluştu"
+        # --- BASİT ANALİZ ---
+        if "galatasaray" in text_lower and "fener" in text_lower:
+            reply = "Derbi analizi: dengeli maç, KG var ihtimali orta-yüksek"
+
+        elif "galatasaray" in text_lower:
+            reply = "Galatasaray: ev sahibi avantajı + hücum gücü etkili"
+
+        elif "fener" in text_lower:
+            reply = "Fenerbahçe: tempolu oyun + gol üretimi yüksek"
+
         else:
-            reply = "Takım adı yaz (galatasaray / fenerbahçe)"
+            reply = "Takım yaz (örn: galatasaray fenerbahçe)"
 
         send_message(chat_id, reply)
-
         return "ok"
 
     except Exception as e:
-        print("ERROR:", e)
+        print("WEBHOOK ERROR:", e)
         return "ok"
-    if data and "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "")
-
-        text_lower = text.lower()
-
-        if "galatasaray" in text_lower and "fener" in text_lower:
-            reply = "Derbi: dengeli maç, gol var ihtimali yüksek"
-        else:
-            reply = "Takım isimlerini yaz (örnek: galatasaray fenerbahçe)"
-
-        send_message(chat_id, reply)
-
-    return "ok"
 
 
 if __name__ == "__main__":
