@@ -23,27 +23,29 @@ def send_message(chat_id, text):
         pass
 
 
-# ---------------- 1. FIXTURE SEARCH ----------------
-def search_by_text(text):
+# ---------------- TEAM ID BUL ----------------
+def get_team_id(name):
     try:
-        url = f"{API_HOST}/fixtures"
+        url = f"{API_HOST}/teams"
         headers = {"x-apisports-key": API_KEY}
-        params = {"search": text, "next": 10}
+        params = {"search": name}
 
         r = requests.get(url, headers=headers, params=params, timeout=10)
-        return r.json()
+        data = r.json()
+
+        return data["response"][0]["team"]["id"]
     except:
         return None
 
 
-# ---------------- 2. NEXT MATCHES ----------------
-def get_next_matches():
+# ---------------- H2H FIXTURE ----------------
+def get_h2h(team1_id, team2_id):
     try:
         url = f"{API_HOST}/fixtures"
         headers = {"x-apisports-key": API_KEY}
-        params = {"next": 10}
+        params = {"h2h": f"{team1_id}-{team2_id}", "next": 10}
 
-        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r = requests.get(url, headers=headers, timeout=10)
         return r.json()
     except:
         return None
@@ -60,37 +62,43 @@ def webhook():
     chat_id = data["message"]["chat"]["id"]
     text = data["message"].get("text", "").lower()
 
-    result = search_by_text(text)
+    parts = text.split()
 
-    match = None
+    if len(parts) < 2:
+        send_message(chat_id, "İki takım yaz: Galatasaray Fenerbahçe")
+        return "ok"
 
-    # 1. TEXT SEARCH DENEME
-    if result and result.get("response"):
-        match = result["response"][0]
+    team1 = parts[0]
+    team2 = parts[1]
 
-    # 2. YOKSA NEXT MATCHES DENEME
-    if not match:
-        result2 = get_next_matches()
+    team1_id = get_team_id(team1)
+    team2_id = get_team_id(team2)
 
-        if result2 and result2.get("response"):
-            for m in result2["response"]:
-                home = m["teams"]["home"]["name"].lower()
-                away = m["teams"]["away"]["name"].lower()
+    if not team1_id or not team2_id:
+        send_message(chat_id, "Takım ID bulunamadı")
+        return "ok"
 
-                if text in home or text in away:
-                    match = m
-                    break
+    result = get_h2h(team1_id, team2_id)
 
-    # ---------------- RESPONSE ----------------
-    if match:
-        reply = (
-            "📊 MAÇ BULUNDU\n\n"
-            f"🏟️ {match['teams']['home']['name']} vs {match['teams']['away']['name']}\n"
-            f"🏆 {match['league']['name']}\n"
-            f"📅 {match['fixture']['date']}"
-        )
-    else:
-        reply = "Maç bulunamadı (API eşleşmedi)"
+    try:
+        if result and result.get("response"):
+            match = result["response"][0]
+
+            home = match["teams"]["home"]["name"]
+            away = match["teams"]["away"]["name"]
+            league = match["league"]["name"]
+            date = match["fixture"]["date"]
+
+            reply = (
+                "📊 MAÇ BULUNDU\n\n"
+                f"🏟️ {home} vs {away}\n"
+                f"🏆 {league}\n"
+                f"📅 {date}"
+            )
+        else:
+            reply = "Maç bulunamadı (H2H veri yok)"
+    except:
+        reply = "Veri işlenemedi"
 
     send_message(chat_id, reply)
     return "ok"
@@ -98,7 +106,7 @@ def webhook():
 
 @app.route("/")
 def home():
-    return "Bot çalışıyor"
+    return "Bot aktif"
 
 
 if __name__ == "__main__":
