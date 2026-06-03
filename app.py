@@ -13,11 +13,11 @@ def send_message(chat_id, text):
         "text": text
     })
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def home():
     return "Bot çalışıyor"
 
-@app.route(f"/{TOKEN}", methods=["POST"])
+@app.route(f"/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
 
