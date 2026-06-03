@@ -29,13 +29,22 @@ def search_matches(text):
     headers = {"x-apisports-key": API_KEY}
 
     params = {
-        "search": text,
         "next": 10
     }
 
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        return r.json()
+        r = requests.get(url, headers=headers, timeout=10)
+        data = r.json()
+
+        for match in data.get("response", []):
+            home = match["teams"]["home"]["name"].lower()
+            away = match["teams"]["away"]["name"].lower()
+
+            if text.lower() in home or text.lower() in away:
+                return {"response": [match]}
+
+        return data
+
     except:
         return None
 
