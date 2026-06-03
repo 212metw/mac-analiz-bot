@@ -8,72 +8,33 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 API_KEY = os.getenv("FOOTBALL_API_KEY")
 
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
+API_HOST = "https://v3.football.api-sports.io"
 
 
 # ---------------- TELEGRAM ----------------
 def send_message(chat_id, text):
-    try:
-        requests.post(
-            BASE_URL + "/sendMessage",
-            json={"chat_id": chat_id, "text": text},
-            timeout=5
-        )
-    except:
-        pass
+    requests.post(
+        BASE_URL + "/sendMessage",
+        json={"chat_id": chat_id, "text": text},
+        timeout=10
+    )
 
 
-# ---------------- ANALİZ MOTORU ----------------
-def analyze_match():
-    # Basit ama geniş model (sonradan geliştirilecek)
-    home = 50
-    draw = 25
-    away = 25
-
-    over25 = 60
-    under25 = 40
-
-    kg_yes = 58
-    kg_no = 42
-
-    x1 = home + draw
-    x2 = away + draw
-    twelve = home + away
-
-    return {
-        "1": home,
-        "X": draw,
-        "2": away,
-        "over25": over25,
-        "under25": under25,
-        "kg_yes": kg_yes,
-        "kg_no": kg_no,
-        "x1": x1,
-        "x2": x2,
-        "12": twelve
-    }
-
-
-# ---------------- API (opsiyonel) ----------------
-def get_api_data():
-    if not API_KEY:
-        return None
-
-    url = "https://api.football-data.org/v4/matches"
-    headers = {"X-Auth-Token": API_KEY}
+# ---------------- MATCH SEARCH ----------------
+def search_fixture(query):
+    url = f"{API_HOST}/fixtures"
+    headers = {"x-apisports-key": API_KEY}
+    params = {"search": query}
 
     try:
-        r = requests.get(url, headers=headers, timeout=5)
+        r = requests.get(url, headers=headers, params=params, timeout=10)
         return r.json()
-    except:
+    except Exception as e:
+        print("API ERROR:", e)
         return None
 
 
-# ---------------- ROUTES ----------------
-@app.route("/")
-def home():
-    return "Mac Analiz Botu Aktif"
-
-
+# ---------------- WEBHOOK ----------------
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
@@ -83,44 +44,42 @@ def webhook():
             return "ok"
 
         chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "").lower()
+        text = data["message"].get("text", "")
 
-        analysis = analyze_match()
-        api_data = get_api_data()
+        result = search_fixture(text)
 
-        reply = f"""
-📊 MAÇ ANALİZ SİSTEMİ
+        if result and result.get("response"):
+            match = result["response"][0]
+            home = match["teams"]["home"]["name"]
+            away = match["teams"]["away"]["name"]
+            league = match["league"]["name"]
+            date = match["fixture"]["date"]
 
-🏠 1 (Ev): %{analysis['1']}
-🤝 X: %{analysis['X']}
-✈️ 2 (Dep): %{analysis['2']}
+            reply = f"""
+📊 MAÇ BULUNDU
 
-🔁 1X (Ev kaybetmez): %{analysis['x1']}
-🔁 X2 (Dep kaybetmez): %{analysis['x2']}
-🔥 12 (Beraberlik yok): %{analysis['12']}
+🏟️ {home} vs {away}
+🏆 Lig: {league}
+📅 Tarih: {date}
 
-⚽ 2.5 ÜST: %{analysis['over25']}
-⚽ 2.5 ALT: %{analysis['under25']}
-
-🥅 KG VAR: %{analysis['kg_yes']}
-🥅 KG YOK: %{analysis['kg_no']}
+🔎 Veri başarıyla çekildi
 """
-
-        # API çalışıyorsa küçük bilgi ekle
-        if api_data:
-            reply += "\n\n🟢 API bağlantısı aktif"
         else:
-            reply += "\n\n🟡 API kullanılmıyor (statik model)"
+            reply = "Maç bulunamadı (API sonucu boş döndü)"
 
         send_message(chat_id, reply)
         return "ok"
 
     except Exception as e:
-        print("ERROR:", e)
+        print("WEBHOOK ERROR:", e)
         return "ok"
 
 
-# ---------------- START ----------------
+@app.route("/")
+def home():
+    return "Bot çalışıyor"
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
