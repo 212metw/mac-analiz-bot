@@ -11,6 +11,15 @@ BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 API_HOST = "https://v3.football.api-sports.io"
 
 
+# ---------------- SABİT TAKIMLAR ----------------
+TEAMS = {
+    "galatasaray": 448,
+    "fenerbahce": 447,
+    "besiktas": 439,
+    "trabzonspor": 437
+}
+
+
 # ---------------- TELEGRAM ----------------
 def send_message(chat_id, text):
     try:
@@ -23,19 +32,9 @@ def send_message(chat_id, text):
         pass
 
 
-# ---------------- TEAM ID BUL ----------------
+# ---------------- TEAM ID ----------------
 def get_team_id(name):
-    try:
-        url = f"{API_HOST}/teams"
-        headers = {"x-apisports-key": API_KEY}
-        params = {"search": name}
-
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        data = r.json()
-
-        return data["response"][0]["team"]["id"]
-    except:
-        return None
+    return TEAMS.get(name.lower())
 
 
 # ---------------- H2H FIXTURE ----------------
@@ -43,9 +42,13 @@ def get_h2h(team1_id, team2_id):
     try:
         url = f"{API_HOST}/fixtures"
         headers = {"x-apisports-key": API_KEY}
-        params = {"h2h": f"{team1_id}-{team2_id}", "next": 10}
 
-        r = requests.get(url, headers=headers, timeout=10)
+        params = {
+            "h2h": f"{team1_id}-{team2_id}",
+            "next": 10
+        }
+
+        r = requests.get(url, headers=headers, params=params, timeout=10)
         return r.json()
     except:
         return None
@@ -65,7 +68,7 @@ def webhook():
     parts = text.split()
 
     if len(parts) < 2:
-        send_message(chat_id, "İki takım yaz: Galatasaray Fenerbahçe")
+        send_message(chat_id, "İki takım yaz: galatasaray fenerbahce")
         return "ok"
 
     team1 = parts[0]
@@ -75,7 +78,7 @@ def webhook():
     team2_id = get_team_id(team2)
 
     if not team1_id or not team2_id:
-        send_message(chat_id, "Takım ID bulunamadı")
+        send_message(chat_id, "Takım bulunamadı (desteklenen: GS, FB, BJK, TS)")
         return "ok"
 
     result = get_h2h(team1_id, team2_id)
@@ -106,7 +109,7 @@ def webhook():
 
 @app.route("/")
 def home():
-    return "Bot aktif"
+    return "Bot çalışıyor"
 
 
 if __name__ == "__main__":
