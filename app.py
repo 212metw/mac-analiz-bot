@@ -38,10 +38,37 @@ def search_fixture(query):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data or "message" not in data:
             return "ok"
+
+        message = data["message"]
+        chat_id = message.get("chat", {}).get("id")
+        text = message.get("text", "")
+
+        if not chat_id:
+            return "ok"
+
+        result = search_fixture(text)
+
+        if result and result.get("response"):
+            match = result["response"][0]
+
+            home = match["teams"]["home"]["name"]
+            away = match["teams"]["away"]["name"]
+            league = match["league"]["name"]
+
+            reply = f"🏟️ {home} vs {away}\n🏆 {league}"
+        else:
+            reply = "Maç bulunamadı"
+
+        send_message(chat_id, reply)
+        return "ok"
+
+    except Exception as e:
+        print("WEBHOOK ERROR:", e)
+        return "ok"
 
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
