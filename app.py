@@ -30,7 +30,8 @@ def home():
     return "Bot çalışıyor"
 
 @app.route("/webhook", methods=["POST"])
-def webhook():
+def webhook():reply = f"API KEY VAR MI: {FOOTBALL_API_KEY}"
+send_message(chat_id, reply)
     try:
         data = request.get_json()
         if not data or "message" not in data:
