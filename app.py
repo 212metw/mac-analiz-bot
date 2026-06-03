@@ -11,15 +11,6 @@ BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 API_HOST = "https://v3.football.api-sports.io"
 
 
-# ---------------- SABİT TAKIMLAR ----------------
-TEAMS = {
-    "galatasaray": 448,
-    "fenerbahce": 447,
-    "besiktas": 439,
-    "trabzonspor": 437
-}
-
-
 # ---------------- TELEGRAM ----------------
 def send_message(chat_id, text):
     try:
@@ -32,21 +23,13 @@ def send_message(chat_id, text):
         pass
 
 
-# ---------------- TEAM ID ----------------
-def get_team_id(name):
-    return TEAMS.get(name.lower())
-
-
-# ---------------- H2H FIXTURE ----------------
-def get_h2h(team1_id, team2_id):
+# ---------------- FIXTURES ----------------
+def get_fixtures():
     try:
         url = f"{API_HOST}/fixtures"
         headers = {"x-apisports-key": API_KEY}
 
-        params = {
-            "h2h": f"{team1_id}-{team2_id}",
-            "next": 10
-        }
+        params = {"next": 20}
 
         r = requests.get(url, headers=headers, params=params, timeout=10)
         return r.json()
@@ -65,53 +48,40 @@ def webhook():
     chat_id = data["message"]["chat"]["id"]
     text = data["message"].get("text", "").lower()
 
-    parts = text.split()
+    result = get_fixtures()
 
-    if len(parts) < 2:
-        send_message(chat_id, "İki takım yaz: galatasaray fenerbahce")
-        return "ok"
+    match = None
 
-    team1 = parts[0]
-    team2 = parts[1]
+    if result and result.get("response"):
+        for m in result["response"]:
+            home = m["teams"]["home"]["name"].lower()
+            away = m["teams"]["away"]["name"].lower()
 
-    team1_id = get_team_id(team1)
-    team2_id = get_team_id(team2)
+            if text in home or text in away:
+                match = m
+                break
 
-    if not team1_id or not team2_id:
-        send_message(chat_id, "Takım bulunamadı (desteklenen: GS, FB, BJK, TS)")
-        return "ok"
-
-    result = get_h2h(team1_id, team2_id)
-
-    try:
-        if result and result.get("response"):
-            match = result["response"][0]
-
-            home = match["teams"]["home"]["name"]
-            away = match["teams"]["away"]["name"]
-            league = match["league"]["name"]
-            date = match["fixture"]["date"]
-
-            reply = (
-                "📊 MAÇ BULUNDU\n\n"
-                f"🏟️ {home} vs {away}\n"
-                f"🏆 {league}\n"
-                f"📅 {date}"
-            )
-        else:
-            reply = "Maç bulunamadı (H2H veri yok)"
-    except:
-        reply = "Veri işlenemedi"
+    if match:
+        reply = (
+            "📊 MAÇ BULUNDU\n\n"
+            f"🏟️ {match['teams']['home']['name']} vs {match['teams']['away']['name']}\n"
+            f"🏆 {match['league']['name']}\n"
+            f"📅 {match['fixture']['date']}"
+        )
+    else:
+        reply = "Maç bulunamadı"
 
     send_message(chat_id, reply)
     return "ok"
 
 
+# ---------------- HOME ----------------
 @app.route("/")
 def home():
     return "Bot çalışıyor"
 
 
+# ---------------- START ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
